@@ -1,5 +1,6 @@
 build
 apps/results
+results
 apps/files
 apps/__pycache__
 compile_commands.json

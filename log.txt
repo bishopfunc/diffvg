@@ -1,0 +1,18 @@
+running build
+running build_py
+running egg_info
+writing diffvg.egg-info/PKG-INFO
+writing dependency_links to diffvg.egg-info/dependency_links.txt
+writing requirements to diffvg.egg-info/requires.txt
+writing top-level names to diffvg.egg-info/top_level.txt
+reading manifest file 'diffvg.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+writing manifest file 'diffvg.egg-info/SOURCES.txt'
+running build_ext
+-- pybind11 v3.0.0 
+-- Build with CUDA support
+-- Configuring done (0.2s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/yamamoto/workspace/diffvg/build/temp.linux-x86_64-cpython-39
+[ 14%] Building NVCC (Device) object CMakeFiles/diffvg.dir/diffvg_generated_diffvg.cpp.o
+CMake args:  ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/yamamoto/workspace/diffvg/build/lib.linux-x86_64-cpython-39', '-DPYTHON_LIBRARY=/home/yamamoto/.local/share/uv/python/cpython-3.9.23-linux-x86_64-gnu/lib', '-DPYTHON_INCLUDE_PATH=/home/yamamoto/.local/share/uv/python/cpython-3.9.23-linux-x86_64-gnu/include/python3.9', '-DPython_EXECUTABLE=/home/yamamoto/workspace/diffvg/.venv/bin/python']

@@ -2,9 +2,10 @@ import pydiffvg
 import torch
 import skimage
 import numpy as np
-
+import pathlib
 # Use GPU if available
-pydiffvg.set_use_gpu(torch.cuda.is_available())
+# pydiffvg.set_use_gpu(torch.cuda.is_available())
+pydiffvg.set_use_gpu(False)
 
 canvas_width = 256
 canvas_height = 256
@@ -26,7 +27,9 @@ img = render(256, # width
              None,
              *scene_args)
 # The output image is in linear RGB space. Do Gamma correction before saving the image.
-pydiffvg.imwrite(img.cpu(), 'results/single_circle/target.png', gamma=2.2)
+save_path = pathlib.Path('results/single_circle/target.png')
+save_path.parent.mkdir(parents=True, exist_ok=True)
+pydiffvg.imwrite(img.cpu(), save_path, gamma=2.2)
 target = img.clone()
 
 # Move the circle to produce initial guess
