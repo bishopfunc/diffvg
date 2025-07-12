@@ -3,6 +3,9 @@
 - Python: 3.9
 - CUDA: 12.0
 - 仮想環境: `uv` 
+※ 注意
+- colabでできるかは不明、ローカルはdiffvgのビルドがめんどくさそう
+- diffvgはCPUだけ使うけど、ImageRewardはGPUがないと動かない可能性がある
 
 ```bash
 git clone https://github.com/bishopfunc/diffvg.git
