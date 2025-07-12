@@ -48,6 +48,7 @@ TODO:
 
 
 ## トラブルシューティングメモ
+個人的なメモなので気にしないでください。
 ```bash
 uv add torch torchvision numpy scikit-image cssutils svgpathtools
 uv add "setuptools==68.0"
@@ -59,7 +60,6 @@ python setup.py install
 ```
 
 
-個人的なメモなので気にしないでください。
 
 ```bash
 error: expected template-name before ‘<’ token
