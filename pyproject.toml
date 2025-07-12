@@ -5,13 +5,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "clip>=0.2.0",
     "cssutils>=2.2.0",
+    "image-reward>=1.5",
     "matplotlib>=3.8.4",
     "numpy>=1.22.4",
     "packaging>=21.3",
+    "pillow>=10.0.0",
     "scikit-image>=0.19.3",
     "setuptools==68",
     "svgpathtools>=1.4.1",
-    "torch>=1.13.0",
-    "torchvision>=0.11.3",
+    "torch>=1.13.1",
+    "torchvision>=0.14.1",
 ]
