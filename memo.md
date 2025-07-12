@@ -10,6 +10,7 @@ cd diffvg
 uv sync # これで仮想環境が作成される
 source .venv/bin/activate # 仮想環境をアクティブ化
 python setup.py install # diffvgパッケージのインストール
+python font_sample/main.py # サンプルを実行
 ```
 ※ 公式との変更点
 - `python setup.py install`でCUDAのコンパイルが失敗したため、CPUでコンパイルしている
