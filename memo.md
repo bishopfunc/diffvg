@@ -26,7 +26,8 @@ python font_sample/main.py # サンプルを実行
 - `font_sample`: 作業用のディレクトリ
 - `font_sample/main.py`: [この記事のサンプル](https://zenn.dev/morisawa/articles/about-diffvg)
 - `font_sample/main_font.py`: [この記事のサンプル(フォント) + ImageReward](https://zenn.dev/morisawa/articles/about-diffvg_font)
-  - `loss = diffvg_loss - reward`でImageRewardを追加して最適化するのを意図している
+- `font_sample/test_image_reward.py`: [ImageReward](https://github.com/THUDM/ImageReward/tree/main?tab=readme-ov-file)のサンプル
+- `loss = diffvg_loss - reward`でImageRewardを追加して最適化するのを意図している
 - `font_sample/target_image.png`: 最適化対象の画像に`results/font_sample/target_image.png`をコピーして使用
 - `font_sample/temp_output.svg`: フォントのSVGを確認するために出力したもの、実際は文字列でフォントの種類を指定している
 - `results`: 最適化結果を保存するディレクトリ、`results/font_sample`にフォントサンプルの結果が保存される
