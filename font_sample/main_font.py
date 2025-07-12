@@ -18,17 +18,6 @@ from torchvision import transforms
 
 import pydiffvg
 
-"""
-diffvgnの最適化がうまくいってない
-多分選んでいるフォントが良くない
-
-TODO:
-- [ ] フォントと目標画像の選定を見直す
-- [ ] フォントじゃなくて、図形の最適化でもいいのかも、サンプルはたくさんある
-- [ ] diffvgライブラリの使い方が正しいか確認
-- [ ] diffvgの最適化単体でうまくいった場合、ImageRewardを神
-"""
-
 class ImageReward:
     def __init__(self) -> None:
         self.model = RM.load("ImageReward-v1.0")
