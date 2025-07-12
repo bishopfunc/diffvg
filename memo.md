@@ -4,7 +4,7 @@
 - CUDA: 12.0
 - 仮想環境: `uv` 
 ※ 注意
-- colabでできるかは不明、ローカルはdiffvgのビルドがめんどくさそう
+- colabでできるかは不明、ローカルはdiffvgのビルドがめんどくさそう、windowsやMacの挙動が不明
 - diffvgはCPUだけ使うけど、ImageRewardはGPUがないと動かない可能性がある
 
 ```bash
