@@ -3,7 +3,8 @@ import torch
 import skimage
 
 # Use GPU if available
-pydiffvg.set_use_gpu(torch.cuda.is_available())
+# pydiffvg.set_use_gpu(torch.cuda.is_available())
+pydiffvg.set_use_gpu(False)  # Force CPU for this example
 
 canvas_width, canvas_height = 510, 510
 # https://www.flaticon.com/free-icon/black-plane_61212#term=airplane&page=1&position=8

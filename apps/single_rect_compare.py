@@ -1,22 +1,45 @@
 import argparse
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-import cma
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 
 import pydiffvg
+from apps.geometry import GeometryLoss
+
+
+# --- ベジエ曲線の Path を作成 ---
+def make_cubic_path():
+    points = torch.tensor(
+        [
+            [40.0, 40.0],  # p0
+            [80.0, 40.0],  # c1
+            [120.0, 160.0],  # c2
+            [160.0, 160.0],  # p1
+        ],
+        dtype=torch.float32,
+    )
+
+    num_control_points = torch.tensor([2], dtype=torch.int32)  # cubic
+    path = pydiffvg.Path(
+        num_control_points=num_control_points,
+        points=points,
+        is_closed=False,
+        stroke_width=torch.tensor(2.0),
+        id=0,
+    )
+    return path
 
 
 def plot_loss_history(
-    loss_history: List[float],
+    loss_history_dict: Dict[str, List[float]],
     title: Optional[str] = None,
     save_path: Optional[str] = None,
 ):
     plt.figure(figsize=(8, 5))
-    plt.plot(loss_history, marker="o", label="Best loss per iteration")
+    for key, losses in loss_history_dict.items():
+        plt.plot(losses, marker="o", label=key)
     plt.xlabel("Iteration")
     plt.ylabel("Loss")
     plt.title(title or "Optimization Loss Curve")
@@ -30,145 +53,78 @@ def plot_loss_history(
         plt.show()
 
 
-# 引数解析
+# --- 引数処理 ---
 parser = argparse.ArgumentParser()
 parser.add_argument("--optimizer", choices=["adam", "cma-es"], default="cma-es")
+parser.add_argument("--use-geo-loss", action="store_true")
+parser.add_argument("--exp", type=str, required=True)
 args = parser.parse_args()
 
-# 保存先フォルダ
-save_dir = f"results/single_rect_{args.optimizer.replace('-', '')}"
+save_dir = f"results/bezier_path_{args.exp}"
 os.makedirs(save_dir, exist_ok=True)
 
-# デバイス設定
 pydiffvg.set_use_gpu(False)
 canvas_width, canvas_height = 256, 256
 
-# 目標画像の作成
-rect = pydiffvg.Rect(
-    p_min=torch.tensor([40.0, 40.0]), p_max=torch.tensor([160.0, 160.0])
-)
-shapes = [rect]
+# --- Path 作成とターゲット画像生成 ---
+path = make_cubic_path()
+shapes = [path]
 shape_group = pydiffvg.ShapeGroup(
     shape_ids=torch.tensor([0]), fill_color=torch.tensor([0.3, 0.6, 0.3, 1.0])
 )
 shape_groups = [shape_group]
 render = pydiffvg.RenderFunction.apply
-
 scene_args = pydiffvg.RenderFunction.serialize_scene(
     canvas_width, canvas_height, shapes, shape_groups
 )
 target = render(canvas_width, canvas_height, 2, 2, 0, None, *scene_args).cpu()
 pydiffvg.imwrite(target, os.path.join(save_dir, "target.png"), gamma=2.2)
 
+# --- GeometryLoss の初期化 ---
+geometry_loss = GeometryLoss(path) if args.use_geo_loss else None
 
-# --- 共通関数 ---
-def encode_params(p_min: np.ndarray, p_max: np.ndarray, color: np.ndarray):
-    return np.concatenate([p_min / 256.0, p_max / 256.0, color])
+# --- 最適化対象のパラメータ（点群）を学習対象に ---
+points = path.points.clone()
+points.requires_grad = True
+optimizer = torch.optim.Adam([points], lr=1e-1)
 
+loss_history, geo_loss_history, l2_loss_history = [], [], []
 
-def decode_params(params: np.ndarray):
-    p_min_n = torch.tensor(params[0:2], dtype=torch.float32)
-    p_max_n = torch.tensor(params[2:4], dtype=torch.float32)
-    color = torch.tensor(params[4:8], dtype=torch.float32)
-    return p_min_n * 256, p_max_n * 256, color
-
-
-def update_scene(p_min, p_max, color):
-    rect.p_min = p_min
-    rect.p_max = p_max
-    shape_group.fill_color = torch.clamp(color, 0.0, 1.0)
-
-
-def render_only(seed: int):
-    scene_args = pydiffvg.RenderFunction.serialize_scene(
-        canvas_width, canvas_height, shapes, shape_groups
+# --- 最適化ループ（Adam） ---
+for t in range(50):
+    optimizer.zero_grad()
+    path.points = points
+    img = render(
+        canvas_width,
+        canvas_height,
+        2,
+        2,
+        t + 10,
+        None,
+        *pydiffvg.RenderFunction.serialize_scene(
+            canvas_width, canvas_height, shapes, shape_groups
+        ),
+    ).cpu()
+    l2_loss = ((img - target) ** 2).sum()
+    geo = geometry_loss.compute(path) if args.use_geo_loss else torch.tensor(0.0)
+    loss = l2_loss + geo
+    loss.backward()
+    optimizer.step()
+    pydiffvg.imwrite(img, os.path.join(save_dir, f"iter_{t}.png"), gamma=2.2)
+    loss_history.append(loss.item())
+    l2_loss_history.append(l2_loss.item())
+    geo_loss_history.append(geo.item())
+    print(
+        f"Step {t:02d}: total={loss.item():.2f}, l2={l2_loss.item():.2f}, geo={geo.item():.5f}"
     )
-    return render(canvas_width, canvas_height, 2, 2, seed, None, *scene_args).cpu()
 
-
-def render_and_save(filename: str, seed: int):
-    img = render_only(seed)
-    pydiffvg.imwrite(img, filename, gamma=2.2)
-    return img
-
-
-# --- CMA-ES 最適化 ---
-def optimize_cmaes():
-    def loss_fn(params_np: np.ndarray):
-        try:
-            p_min, p_max, color = decode_params(params_np)
-            if (p_min[0] >= p_max[0]) or (p_min[1] >= p_max[1]):
-                return 1e6
-            update_scene(p_min, p_max, color)
-            img = render_only(seed=np.random.randint(10000))
-            return ((img - target) ** 2).sum().item()
-        except Exception:
-            return 1e6
-
-    initial_params = encode_params(
-        np.array([80.0, 20.0]), np.array([100.0, 60.0]), np.array([0.3, 0.2, 0.5, 1.0])
-    )
-    es = cma.CMAEvolutionStrategy(initial_params, 0.02, {"popsize": 10})
-    loss_history = []
-
-    for generation in range(50):
-        solutions = es.ask()
-        losses = [loss_fn(s) for s in solutions]
-        es.tell(solutions, losses)
-        best_params = es.best.get()[0]
-        loss_history.append(min(losses))
-
-        p_min, p_max, color = decode_params(best_params)
-        update_scene(p_min, p_max, color)
-        render_and_save(
-            os.path.join(save_dir, f"iter_{generation}.png"), seed=100 + generation
-        )
-        print(f"Gen {generation}, loss: {min(losses)}")
-
-    return loss_history
-
-
-# --- Adam 最適化 ---
-def optimize_adam():
-    p_min_n = torch.tensor([80.0 / 256.0, 20.0 / 256.0], requires_grad=True)
-    p_max_n = torch.tensor([100.0 / 256.0, 60.0 / 256.0], requires_grad=True)
-    color = torch.tensor([0.3, 0.2, 0.5, 1.0], requires_grad=True)
-    optimizer = torch.optim.Adam([p_min_n, p_max_n, color], lr=1e-2)
-    loss_history = []
-
-    for t in range(50):
-        optimizer.zero_grad()
-        update_scene(p_min_n * 256, p_max_n * 256, color)
-        img = render_and_save(os.path.join(save_dir, f"iter_{t}.png"), seed=100 + t)
-        loss = ((img - target) ** 2).sum()
-        loss.backward()
-        optimizer.step()
-
-        loss_history.append(loss.item())
-        print(f"Step {t}, loss: {loss.item()}")
-
-    return loss_history
-
-
-# --- 実行 ---
-if args.optimizer == "cma-es":
-    print("Using CMA-ES optimizer")
-    loss_history = optimize_cmaes()
-elif args.optimizer == "adam":
-    print("Using Adam optimizer")
-    loss_history = optimize_adam()
-else:
-    raise ValueError(f"Unknown optimizer: {args.optimizer}")
-
-# 最終出力・プロット
-render_and_save(os.path.join(save_dir, "final.png"), seed=9999)
+# --- ロスプロットと動画保存 ---
 plot_loss_history(
-    loss_history,
-    title=f"{args.optimizer.upper()} Loss Curve",
-    save_path=os.path.join(save_dir, "loss_plot.png"),
+    {"total": loss_history, "l2": l2_loss_history, "geo": geo_loss_history},
+    title="Bezier Path Optimization",
+    save_path=os.path.join(save_dir, "loss_curve.png"),
 )
 
-# 動画作成（ログ抑制）
 from subprocess import DEVNULL, call
 
 call(
@@ -188,4 +144,4 @@ call(
     stdout=DEVNULL,
     stderr=DEVNULL,
 )
-print(f"Saved results to {save_dir}/out.mp4")
+print(f"Saved result to {save_dir}/out.mp4")
