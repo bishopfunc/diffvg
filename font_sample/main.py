@@ -102,6 +102,7 @@ for t in range(100):
 
     # 損失関数を計算（平均二乗誤差）
     loss = (img - target).pow(2).mean()
+    print(f"{loss.size(), img.size(), target.size()}")
 
     # 動作確認用
     print("loss:", loss.item())

@@ -12,9 +12,11 @@ dependencies = [
     "numpy>=1.22.4",
     "packaging>=21.3",
     "pillow>=10.0.0",
+    "pygame>=2.6.1",
     "scikit-image>=0.19.3",
     "setuptools==68",
     "svgpathtools>=1.4.1",
     "torch>=1.13.1",
+    "torch-tools>=0.1.5",
     "torchvision>=0.14.1",
 ]

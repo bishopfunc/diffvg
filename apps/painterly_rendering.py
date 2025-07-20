@@ -21,7 +21,8 @@ gamma = 1.0
 
 def main(args):
     # Use GPU if available
-    pydiffvg.set_use_gpu(torch.cuda.is_available())
+    # pydiffvg.set_use_gpu(torch.cuda.is_available())
+    pydiffvg.set_use_gpu(False)
     
     perception_loss = ttools.modules.LPIPS().to(pydiffvg.get_device())
     

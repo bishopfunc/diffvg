@@ -4,7 +4,8 @@ import skimage
 import numpy as np
 
 # Use GPU if available
-pydiffvg.set_use_gpu(torch.cuda.is_available())
+# pydiffvg.set_use_gpu(torch.cuda.is_available())
+pydiffvg.set_use_gpu(False)  # GPUを使わない設定
 
 canvas_width, canvas_height = 256, 256
 circle = pydiffvg.Circle(radius = torch.tensor(40.0),
