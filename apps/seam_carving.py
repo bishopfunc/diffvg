@@ -1,4 +1,11 @@
-"""Retargets an .svg using image-domain seam carving to shrink it."""
+"""
+シームカービングによるSVGリターゲティング
+
+このスクリプトは画像領域でのシームカービングを使用してSVGを縮小します。
+エネルギー関数に基づいて重要度の低い縦方向のシームを除去し、
+微分可能レンダリングを使用してベクター形状を最適化します。
+"""
+
 import os
 import pydiffvg
 import argparse
@@ -10,119 +17,153 @@ import skimage.io
 
 
 def energy(im):
-    """Compute image energy.
-
-    Args:
-        im(np.ndarray) with shape [h, w, 3]: input image.
-
-    Returns:
-        (np.ndarray) with shape [h, w]: energy map.
     """
+    画像のエネルギーを計算します。
+    
+    Sobelフィルターを使用して勾配を計算し、
+    エッジの強度をエネルギーとして使用します。
+
+    引数:
+        im(np.ndarray) 形状[h, w, 3]: 入力画像
+
+    戻り値:
+        (np.ndarray) 形状[h, w]: エネルギーマップ
+    """
+    # Sobelフィルター（x方向）
     f_dx = np.array([
         [-1, 0, 1 ],
         [-2, 0, 2 ],
         [-1, 0, 1 ],
     ])
+    # Sobelフィルター（y方向）
     f_dy = f_dx.T
+    
+    # グレースケール画像に対して勾配を計算
     dx = filters.convolve(im.mean(2), f_dx)
     dy = filters.convolve(im.mean(2), f_dy)
 
+    # 勾配の絶対値の和をエネルギーとする
     return np.abs(dx) + np.abs(dy)
 
 
 @numba.jit(nopython=True)
 def min_seam(e):
-    """Finds the seam with minimal cost in an energy map.
-
-    Args:
-        e(np.ndarray) with shape [h, w]: energy map.
-    
-    Returns:
-        min_e(np.ndarray) with shape [h, w]: for all (y,x) min_e[y, x]
-            is the cost of the minimal seam from 0 to y (top to bottom).
-            The minimal seam can be found by looking at the last row of min_e.
-            This is computed by dynamic programming.
-        argmin_e(np.ndarray) with shape [h, w]: for all (y,x) argmin_e[y, x]
-            contains the x coordinate corresponding to this seam in the
-            previous row (y-1). We use this for backtracking.
     """
-    # initialize to local energy
+    エネルギーマップから最小コストのシームを見つけます。
+    
+    動的プログラミングを使用して、上から下への最小エネルギーパスを計算します。
+
+    引数:
+        e(np.ndarray) 形状[h, w]: エネルギーマップ
+    
+    戻り値:
+        min_e(np.ndarray) 形状[h, w]: 各位置(y,x)について、
+            上端から位置yまでの最小シームコスト
+        argmin_e(np.ndarray) 形状[h, w]: 各位置(y,x)について、
+            前の行(y-1)での最適パスのx座標（バックトラック用）
+    """
+    # ローカルエネルギーで初期化
     min_e = e.copy()
     argmin_e = np.zeros_like(e, dtype=np.int64)
 
-    h, w =  e.shape
+    h, w = e.shape
 
-    # propagate vertically
+    # 縦方向に伝播
     for y in range(1, h):
         for x in range(w):
+            # 左端の場合
             if x == 0:
                 idx = np.argmin(e[y-1, x:x+2])
                 argmin_e[y, x] = idx + x
                 mini = e[y-1, x + idx]
+            # 右端の場合
             elif x == w-1:
                 idx = np.argmin(e[y-1, x-1:x+1])
                 argmin_e[y, x] = idx + x - 1
                 mini = e[y-1, x + idx - 1]
+            # 中央の場合
             else:
                 idx = np.argmin(e[y-1, x-1:x+2])
                 argmin_e[y, x] = idx + x - 1
                 mini = e[y-1, x + idx - 1]
 
+            # 累積最小コストを更新
             min_e[y, x] = min_e[y, x] + mini
 
     return min_e, argmin_e
 
 
 def carve_seam(im):
-    """Carves a vertical seam in an image, reducing it's horizontal size by 1.
-
-    Args:
-        im(np.ndarray) with shape [h, w, 3]: input image.
-
-    Returns:
-        (np.ndarray) with shape [h, w-1, 1]: the image with one seam removed.
     """
+    画像から縦方向のシームを除去し、横幅を1ピクセル縮小します。
 
+    引数:
+        im(np.ndarray) 形状[h, w, 3]: 入力画像
+
+    戻り値:
+        (np.ndarray) 形状[h, w-1, 3]: シームが除去された画像
+    """
+    # エネルギーマップを計算
     e = energy(im)
     min_e, argmin_e = min_seam(e)
-    h, w =  im.shape[:2]
+    h, w = im.shape[:2]
 
-    # boolean flags for the pixels to preserve
+    # 保持するピクセルのブール値フラグ
     to_keep = np.ones((h, w), dtype=np.bool)
 
-    # get lowest energy (from last row)
+    # 最下行から最小エネルギーの位置を取得
     x = np.argmin(min_e[-1])
     print("carving seam", x, "with energy", min_e[-1, x])
 
-    # backtract to identify the seam
+    # バックトラックしてシームを特定
     for y in range(h-1, -1, -1):
-        # remove seam pixel
+        # シームピクセルを除去
         to_keep[y, x] = False
         x = argmin_e[y, x]
 
-    # replicate mask over color channels
+    # マスクをカラーチャンネルに複製
     to_keep = np.stack(3*[to_keep], axis=2)
     new_im = im[to_keep].reshape((h, w-1, 3))
     return new_im
 
 
 def render(canvas_width, canvas_height, shapes, shape_groups, samples=2):
+    """
+    シェイプとシェイプグループを描画して画像を生成します。
+    
+    引数:
+        canvas_width: キャンバスの幅
+        canvas_height: キャンバスの高さ
+        shapes: 描画するシェイプのリスト
+        shape_groups: シェイプグループのリスト
+        samples: サンプリング数（デフォルト: 2）
+        
+    戻り値:
+        描画された画像テンソル
+    """
     _render = pydiffvg.RenderFunction.apply
     scene_args = pydiffvg.RenderFunction.serialize_scene(\
         canvas_width, canvas_height, shapes, shape_groups)
 
-    img = _render(canvas_width, # width
-                 canvas_height, # height
-                 samples,   # num_samples_x
-                 samples,   # num_samples_y
-                 0,   # seed
+    img = _render(canvas_width, # 幅
+                 canvas_height, # 高さ
+                 samples,   # x方向サンプル数
+                 samples,   # y方向サンプル数
+                 0,   # 乱数シード
                  None,
                  *scene_args)
     return img
 
 
 def vector_rescale(shapes, scale_x=1.00, scale_y=1.00):
-    new_shapes = []
+    """
+    ベクター形状の座標をスケーリングします。
+    
+    引数:
+        shapes: スケーリングするシェイプのリスト
+        scale_x: x方向のスケール係数
+        scale_y: y方向のスケール係数
+    """
     for path in shapes:
         path.points[..., 0] *= scale_x
         path.points[..., 1] *= scale_y

@@ -1,11 +1,19 @@
 """
-Scream: python painterly_rendering.py imgs/scream.jpg --num_paths 2048 --max_width 4.0
-Fallingwater: python painterly_rendering.py imgs/fallingwater.jpg --num_paths 2048 --max_width 4.0
-Fallingwater: python painterly_rendering.py imgs/fallingwater.jpg --num_paths 2048 --max_width 4.0 --use_lpips_loss
-Baboon: python painterly_rendering.py imgs/baboon.png --num_paths 1024 --max_width 4.0 --num_iter 250
-Baboon Lpips: python painterly_rendering.py imgs/baboon.png --num_paths 1024 --max_width 4.0 --num_iter 500 --use_lpips_loss
-Kitty: python painterly_rendering.py imgs/kitty.jpg --num_paths 1024 --use_blob
+絵画風レンダリングデモ
+
+このスクリプトは入力画像を微分可能なベクターグラフィックスのパスで近似し、
+絵画風の表現を生成します。ランダムに生成されたパスを最適化して、
+目標画像に近づけます。
+
+使用例:
+    Scream: python painterly_rendering.py imgs/scream.jpg --num_paths 2048 --max_width 4.0
+    Fallingwater: python painterly_rendering.py imgs/fallingwater.jpg --num_paths 2048 --max_width 4.0
+    Fallingwater: python painterly_rendering.py imgs/fallingwater.jpg --num_paths 2048 --max_width 4.0 --use_lpips_loss
+    Baboon: python painterly_rendering.py imgs/baboon.png --num_paths 1024 --max_width 4.0 --num_iter 250
+    Baboon Lpips: python painterly_rendering.py imgs/baboon.png --num_paths 1024 --max_width 4.0 --num_iter 500 --use_lpips_loss
+    Kitty: python painterly_rendering.py imgs/kitty.jpg --num_paths 1024 --use_blob
 """
+
 import pydiffvg
 import torch
 import skimage
@@ -15,28 +23,39 @@ import ttools.modules
 import argparse
 import math
 
+# タイミング情報を表示
 pydiffvg.set_print_timing(True)
 
+# ガンマ補正値
 gamma = 1.0
 
 def main(args):
-    # Use GPU if available
+    """
+    絵画風レンダリングのメイン処理を実行します。
+    
+    引数:
+        args: コマンドライン引数
+    """
+    # GPUが利用可能な場合は使用（現在は無効化）
     # pydiffvg.set_use_gpu(torch.cuda.is_available())
     pydiffvg.set_use_gpu(False)
     
+    # LPIPS知覚損失関数を初期化
     perception_loss = ttools.modules.LPIPS().to(pydiffvg.get_device())
     
-    #target = torch.from_numpy(skimage.io.imread('imgs/lena.png')).to(torch.float32) / 255.0
+    # 目標画像を読み込み、前処理を実行
     target = torch.from_numpy(skimage.io.imread(args.target)).to(torch.float32) / 255.0
-    target = target.pow(gamma)
+    target = target.pow(gamma)  # ガンマ補正を適用
     target = target.to(pydiffvg.get_device())
-    target = target.unsqueeze(0)
-    target = target.permute(0, 3, 1, 2) # NHWC -> NCHW
-    #target = torch.nn.functional.interpolate(target, size = [256, 256], mode = 'area')
-    canvas_width, canvas_height = target.shape[3], target.shape[2]
-    num_paths = args.num_paths
-    max_width = args.max_width
+    target = target.unsqueeze(0)  # バッチ次元を追加
+    target = target.permute(0, 3, 1, 2)  # NHWC -> NCHW形式に変換
     
+    # キャンバスサイズを目標画像のサイズに設定
+    canvas_width, canvas_height = target.shape[3], target.shape[2]
+    num_paths = args.num_paths  # 生成するパス数
+    max_width = args.max_width  # 最大線幅
+    
+    # 再現性のために乱数シードを固定
     random.seed(1234)
     torch.manual_seed(1234)
     
