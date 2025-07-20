@@ -3,7 +3,8 @@ import torch
 import skimage
 
 # Use GPU if available
-pydiffvg.set_use_gpu(torch.cuda.is_available())
+# pydiffvg.set_use_gpu(torch.cuda.is_available())
+pydiffvg.set_use_gpu(False)  # Force CPU for this example
 
 canvas_width, canvas_height = 256, 256
 num_control_points = torch.tensor([2, 2, 2])
