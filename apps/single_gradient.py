@@ -4,7 +4,8 @@ import skimage
 import numpy as np
 
 # Use GPU if available
-pydiffvg.set_use_gpu(torch.cuda.is_available())
+# pydiffvg.set_use_gpu(torch.cuda.is_available())
+pydiffvg.set_use_gpu(False)  # Force CPU for this example
 
 canvas_width, canvas_height = 256, 256
 color = pydiffvg.LinearGradient(\
